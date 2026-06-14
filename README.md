@@ -3,6 +3,10 @@
 Charbor is an AI-mediated communication workspace designed to reduce emotional
 friction and build shared understanding between two participants.
 
+## Live Demo
+
+[Open Charbor](https://masakiaijima.github.io/charbor/)
+
 ## MVP
 
 - Three-panel workspace with topics, conversation, and Harbor Log
@@ -26,3 +30,5 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run build
 npx tsc --noEmit
 ```
+
+Commits pushed to `main` are automatically deployed to GitHub Pages.

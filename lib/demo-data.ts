@@ -1,4 +1,4 @@
-import type { HarborLog, Message, Topic } from "@/lib/types";
+import type { HarborLog, Locale, Message, Topic } from "@/lib/types";
 
 export const topics: Topic[] = [
   {
@@ -165,3 +165,185 @@ export const harborLogs: Record<string, HarborLog> = {
     decisions: [],
   },
 };
+
+const japaneseTopics: Topic[] = [
+  {
+    id: "release-scope-ja",
+    title: "リリース範囲",
+    createdAt: "2026-06-10T09:00:00.000Z",
+    latestUpdate: "次のマイルストーンの範囲を固定できますか？",
+    unreadCount: 2,
+  },
+  {
+    id: "design-review-ja",
+    title: "デザインレビュー",
+    createdAt: "2026-06-11T02:00:00.000Z",
+    latestUpdate: "空状態の最終確認待ち",
+    unreadCount: 0,
+  },
+  {
+    id: "customer-pilot-ja",
+    title: "顧客パイロット",
+    createdAt: "2026-06-12T06:00:00.000Z",
+    latestUpdate: "3チームの参加が確定",
+    unreadCount: 3,
+  },
+];
+
+const japaneseMessages: Message[] = [
+  {
+    id: "msg-ja-1",
+    topicId: "release-scope-ja",
+    type: "remote_ai_message",
+    author: "MayaのAI仲介者",
+    content:
+      "Mayaは、パイロットに必要な機能を明確にしたいと考えています。現時点で作業を追加すると、リリース日の確実性が下がることを懸念しています。",
+    createdAt: "2026-06-14T04:18:00.000Z",
+  },
+  {
+    id: "msg-ja-2",
+    topicId: "release-scope-ja",
+    type: "user_message",
+    author: "あなた",
+    content: "要件が何度も変わっていて、このままでは予定に間に合いません。",
+    createdAt: "2026-06-14T04:22:00.000Z",
+  },
+  {
+    id: "msg-ja-3",
+    topicId: "release-scope-ja",
+    type: "ai_translation",
+    author: "あなたのAI仲介者",
+    content:
+      "観察: 要件が複数回変更されています。\n解釈: 変更が納期の見通しに影響している可能性があります。\n依頼: 次のマイルストーンに向けて、安定した範囲を定義できますか？",
+    createdAt: "2026-06-14T04:22:20.000Z",
+  },
+  {
+    id: "msg-ja-4",
+    topicId: "release-scope-ja",
+    type: "remote_ai_message",
+    author: "MayaのAI仲介者",
+    content:
+      "Mayaも、安定したマイルストーンが必要だと考えています。パイロットはオンボーディングとレポート機能に絞り、外部連携は次の段階へ移すことを提案しています。",
+    createdAt: "2026-06-14T04:27:00.000Z",
+  },
+  {
+    id: "msg-ja-5",
+    topicId: "design-review-ja",
+    type: "remote_ai_message",
+    author: "MayaのAI仲介者",
+    content:
+      "主要画面のデザインは完了しています。実装へ渡す前に、空状態の表現を最終確認したいと考えています。",
+    createdAt: "2026-06-13T07:30:00.000Z",
+  },
+  {
+    id: "msg-ja-6",
+    topicId: "customer-pilot-ja",
+    type: "remote_ai_message",
+    author: "MayaのAI仲介者",
+    content:
+      "3つの顧客チームがパイロット参加を確定しました。サポート向けオンボーディングを同じ週に実施できるかが未解決です。",
+    createdAt: "2026-06-13T09:45:00.000Z",
+  },
+];
+
+const japaneseHarborLogs: Record<string, HarborLog> = {
+  "release-scope-ja": {
+    topicId: "release-scope-ja",
+    goal: [
+      {
+        id: "goal-ja-1",
+        content: "プロジェクトを成功させる。",
+        confidence: 0.96,
+      },
+    ],
+    agreements: [
+      {
+        id: "agreement-ja-1",
+        content: "要件が複数回変更されている。",
+        confidence: 0.91,
+      },
+      {
+        id: "agreement-ja-2",
+        content: "安定したマイルストーンが納期への信頼を高める。",
+        confidence: 0.87,
+      },
+    ],
+    disagreements: [
+      {
+        id: "disagreement-ja-1",
+        content: "パイロットに必須とする機能の範囲。",
+        confidence: 0.68,
+      },
+    ],
+    openQuestions: [
+      {
+        id: "question-ja-1",
+        content: "どのようにスコープを安定させるか？",
+        confidence: 0.84,
+      },
+    ],
+    decisions: [],
+  },
+  "design-review-ja": {
+    topicId: "design-review-ja",
+    goal: [
+      {
+        id: "goal-design-ja",
+        content: "実装可能な状態でデザインを引き渡す。",
+        confidence: 0.94,
+      },
+    ],
+    agreements: [],
+    disagreements: [],
+    openQuestions: [
+      {
+        id: "question-design-ja",
+        content: "空状態のデザインは最終承認できるか？",
+        confidence: 0.82,
+      },
+    ],
+    decisions: [],
+  },
+  "customer-pilot-ja": {
+    topicId: "customer-pilot-ja",
+    goal: [
+      {
+        id: "goal-pilot-ja",
+        content: "3つの顧客チームで集中したパイロットを実施する。",
+        confidence: 0.97,
+      },
+    ],
+    agreements: [
+      {
+        id: "agreement-pilot-ja",
+        content: "3チームが参加準備を完了している。",
+        confidence: 0.98,
+      },
+    ],
+    disagreements: [],
+    openQuestions: [
+      {
+        id: "question-pilot-ja",
+        content: "サポート向けオンボーディングをいつ実施するか？",
+        confidence: 0.76,
+      },
+    ],
+    decisions: [],
+  },
+};
+
+export function getDemoData(locale: Locale) {
+  if (locale === "ja") {
+    return {
+      topics: structuredClone(japaneseTopics),
+      messages: structuredClone(japaneseMessages),
+      harborLogs: structuredClone(japaneseHarborLogs),
+    };
+  }
+
+  return {
+    topics: structuredClone(topics),
+    messages: structuredClone(messages),
+    harborLogs: structuredClone(harborLogs),
+  };
+}

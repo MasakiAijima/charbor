@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Anchor,
   ArrowUp,
@@ -8,13 +8,14 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Globe2,
   Handshake,
   Inbox,
   Menu,
   MessageSquareMore,
-  MoreHorizontal,
   Plus,
   Search,
+  Settings,
   Sparkles,
   Target,
   X,
@@ -23,12 +24,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { harborLogs, messages as initialMessages, topics as initialTopics } from "@/lib/demo-data";
+import { getDemoData } from "@/lib/demo-data";
 import { anchorDecision, updateSharedUnderstanding } from "@/lib/harborLog";
+import { translations, type Translation } from "@/lib/i18n";
 import { mediateMessage } from "@/lib/mediator";
 import type {
   HarborLog,
   HarborLogItem,
+  Locale,
   Message,
   MessageType,
   Topic,
@@ -36,24 +39,20 @@ import type {
 import { cn } from "@/lib/utils";
 
 const sectionMeta = {
-  goal: { label: "Goal", icon: Target, tone: "text-blue-700 bg-blue-50" },
+  goal: { icon: Target, tone: "text-blue-700 bg-blue-50" },
   agreements: {
-    label: "Agreements",
     icon: Handshake,
     tone: "text-emerald-700 bg-emerald-50",
   },
   disagreements: {
-    label: "Disagreements",
     icon: MessageSquareMore,
     tone: "text-amber-700 bg-amber-50",
   },
   openQuestions: {
-    label: "Open questions",
     icon: CircleHelp,
     tone: "text-violet-700 bg-violet-50",
   },
   decisions: {
-    label: "Decisions",
     icon: Check,
     tone: "text-slate-700 bg-slate-100",
   },
@@ -61,8 +60,8 @@ const sectionMeta = {
 
 type HarborSection = keyof typeof sectionMeta;
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
+function formatTime(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : "en", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: "Asia/Tokyo",
@@ -95,9 +94,13 @@ function MessageAvatar({ type }: { type: MessageType }) {
 function MessageCard({
   message,
   onAnchor,
+  locale,
+  t,
 }: {
   message: Message;
   onAnchor: (message: Message) => void;
+  locale: Locale;
+  t: Translation;
 }) {
   const isTranslation = message.type === "ai_translation";
   const isRemote = message.type === "remote_ai_message";
@@ -111,13 +114,13 @@ function MessageCard({
             {message.author}
           </span>
           {isTranslation && (
-            <Badge className="bg-blue-50 text-blue-700">Mediated</Badge>
+            <Badge className="bg-blue-50 text-blue-700">{t.mediated}</Badge>
           )}
           {isRemote && (
-            <Badge className="bg-violet-50 text-violet-700">Received</Badge>
+            <Badge className="bg-violet-50 text-violet-700">{t.received}</Badge>
           )}
           <span className="text-xs text-slate-400">
-            {formatTime(message.createdAt)}
+            {formatTime(message.createdAt, locale)}
           </span>
         </div>
         <div
@@ -148,7 +151,7 @@ function MessageCard({
             ) : (
               <Anchor className="size-3.5" />
             )}
-            {message.anchored ? "Anchored" : "Anchor to Harbor Log"}
+            {message.anchored ? t.anchored : t.anchorToLog}
           </button>
         </div>
       </div>
@@ -159,9 +162,11 @@ function MessageCard({
 function HarborSectionBlock({
   section,
   items,
+  t,
 }: {
   section: HarborSection;
   items: HarborLogItem[];
+  t: Translation;
 }) {
   const meta = sectionMeta[section];
   const Icon = meta.icon;
@@ -173,7 +178,7 @@ function HarborSectionBlock({
           <Icon className="size-3.5" />
         </div>
         <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-          {meta.label}
+          {t[section]}
         </h3>
         <span className="text-xs text-slate-300">{items.length}</span>
       </div>
@@ -203,7 +208,7 @@ function HarborSectionBlock({
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">
-          Nothing captured yet
+          {t.nothingCaptured}
         </div>
       )}
     </section>
@@ -211,15 +216,39 @@ function HarborSectionBlock({
 }
 
 export function CharborWorkspace() {
-  const [topics, setTopics] = useState(initialTopics);
-  const [activeTopicId, setActiveTopicId] = useState(initialTopics[0].id);
-  const [messages, setMessages] = useState(initialMessages);
-  const [logs, setLogs] = useState<Record<string, HarborLog>>(harborLogs);
+  const initialData = useMemo(() => getDemoData("en"), []);
+  const [locale, setLocale] = useState<Locale>("en");
+  const [topics, setTopics] = useState(initialData.topics);
+  const [activeTopicId, setActiveTopicId] = useState(initialData.topics[0].id);
+  const [messages, setMessages] = useState(initialData.messages);
+  const [logs, setLogs] = useState<Record<string, HarborLog>>(
+    initialData.harborLogs,
+  );
   const [draft, setDraft] = useState("");
   const [isCreatingTopic, setIsCreatingTopic] = useState(false);
   const [newTopicTitle, setNewTopicTitle] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"topics" | "log" | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const t = translations[locale];
+
+  useEffect(() => {
+    const savedLocale = window.localStorage.getItem("charbor-locale");
+    if (savedLocale === "ja") {
+      changeLocale("ja");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsSettingsOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSettingsOpen]);
 
   const activeTopic =
     topics.find((topic) => topic.id === activeTopicId) ?? topics[0];
@@ -240,24 +269,39 @@ export function CharborWorkspace() {
   const understandingHealth =
     understandingItemCount === 0
       ? {
-          label: "Ready",
+          label: t.healthReady,
           progress: 18,
-          description: "Start the conversation to build shared understanding.",
+          description: t.healthEmpty,
         }
       : unresolvedCount > 2
         ? {
-            label: "Needs focus",
+            label: t.healthNeedsFocus,
             progress: 52,
-            description: `${unresolvedCount} unresolved items need attention.`,
+            description: t.healthUnresolved(unresolvedCount),
           }
         : {
-            label: "Good",
+            label: t.healthGood,
             progress: 78,
             description:
               unresolvedCount === 1
-                ? "Goals are aligned. One item still needs resolution."
-                : `Goals are aligned. ${unresolvedCount} items still need resolution.`,
+                ? t.healthOneRemaining
+                : t.healthRemaining(unresolvedCount),
           };
+
+  function changeLocale(nextLocale: Locale) {
+    const nextData = getDemoData(nextLocale);
+    setLocale(nextLocale);
+    setTopics(nextData.topics);
+    setMessages(nextData.messages);
+    setLogs(nextData.harborLogs);
+    setActiveTopicId(nextData.topics[0].id);
+    setDraft("");
+    setNewTopicTitle("");
+    setIsCreatingTopic(false);
+    setMobilePanel(null);
+    window.localStorage.setItem("charbor-locale", nextLocale);
+    document.documentElement.lang = nextLocale;
+  }
 
   function switchTopic(topicId: string) {
     setActiveTopicId(topicId);
@@ -279,7 +323,7 @@ export function CharborWorkspace() {
       id,
       title,
       createdAt: now,
-      latestUpdate: "New conversation",
+      latestUpdate: t.newConversation,
       unreadCount: 0,
     };
     const log: HarborLog = {
@@ -307,16 +351,20 @@ export function CharborWorkspace() {
       id: `msg-${now.getTime()}`,
       topicId: activeTopicId,
       type: "user_message",
-      author: "You",
+      author: t.you,
       content,
       createdAt: now.toISOString(),
     };
-    const mediated = mediateMessage({ userMessage: content, harborLog: activeLog });
+    const mediated = mediateMessage({
+      userMessage: content,
+      harborLog: activeLog,
+      locale,
+    });
     const aiMessage: Message = {
       id: `msg-${now.getTime()}-ai`,
       topicId: activeTopicId,
       type: "ai_translation",
-      author: "Your mediator",
+      author: t.yourMediator,
       content: mediated.translatedMessage,
       createdAt: new Date(now.getTime() + 1000).toISOString(),
     };
@@ -380,7 +428,7 @@ export function CharborWorkspace() {
               variant="ghost"
               size="icon"
               onClick={() => setMobilePanel(null)}
-              aria-label="Close topics"
+              aria-label={t.closeTopics}
             >
               <X className="size-4" />
             </Button>
@@ -389,7 +437,7 @@ export function CharborWorkspace() {
           <div className="border-b border-slate-200 p-3">
             <button className="flex h-9 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-xs text-slate-400 shadow-sm">
               <Search className="size-3.5" />
-              Search conversations
+              {t.searchConversations}
               <span className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 text-[10px]">
                 ⌘K
               </span>
@@ -398,13 +446,13 @@ export function CharborWorkspace() {
 
           <div className="flex items-center justify-between px-4 pb-2 pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-              Topics
+              {t.topics}
             </p>
             <button
               type="button"
               onClick={() => setIsCreatingTopic(true)}
               className="text-slate-400 transition-colors hover:text-slate-900"
-              aria-label="Create topic"
+              aria-label={t.createTopic}
             >
               <Plus className="size-4" />
             </button>
@@ -421,17 +469,17 @@ export function CharborWorkspace() {
                     if (event.key === "Enter") createTopic();
                     if (event.key === "Escape") setIsCreatingTopic(false);
                   }}
-                  placeholder="Topic name"
+                  placeholder={t.topicName}
                   className="h-8 w-full rounded-md border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-slate-200"
                 />
                 <div className="mt-2 flex gap-1">
-                  <Button size="sm" onClick={createTopic}>Create</Button>
+                  <Button size="sm" onClick={createTopic}>{t.create}</Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setIsCreatingTopic(false)}
                   >
-                    Cancel
+                    {t.cancel}
                   </Button>
                 </div>
               </div>
@@ -479,10 +527,19 @@ export function CharborWorkspace() {
                 YO
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-800">Your workspace</p>
-                <p className="text-[11px] text-slate-400">2 participants</p>
+                <p className="text-xs font-semibold text-slate-800">
+                  {t.yourWorkspace}
+                </p>
+                <p className="text-[11px] text-slate-400">{t.participants}</p>
               </div>
-              <MoreHorizontal className="size-4 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="grid size-8 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-900"
+                aria-label={t.settings}
+              >
+                <Settings className="size-4" />
+              </button>
             </div>
           </div>
         </aside>
@@ -494,7 +551,7 @@ export function CharborWorkspace() {
               variant="ghost"
               size="icon"
               onClick={() => setMobilePanel("topics")}
-              aria-label="Open topics"
+              aria-label={t.openTopics}
             >
               <Menu className="size-4" />
             </Button>
@@ -506,7 +563,7 @@ export function CharborWorkspace() {
                 <ChevronDown className="size-3.5 text-slate-400" />
               </div>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                AI-mediated conversation · Maya and you
+                {t.conversationSubtitle}
               </p>
             </div>
             <div className="hidden items-center -space-x-2 sm:flex">
@@ -524,7 +581,7 @@ export function CharborWorkspace() {
               onClick={() => setMobilePanel("log")}
             >
               <Inbox className="size-3.5" />
-              Harbor Log
+              {t.harborLog}
             </Button>
           </header>
 
@@ -535,7 +592,7 @@ export function CharborWorkspace() {
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-slate-100" />
                     <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                      Today
+                      {t.today}
                     </span>
                     <div className="h-px flex-1 bg-slate-100" />
                   </div>
@@ -544,6 +601,8 @@ export function CharborWorkspace() {
                       key={message.id}
                       message={message}
                       onAnchor={handleAnchor}
+                      locale={locale}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -553,11 +612,10 @@ export function CharborWorkspace() {
                     <Sparkles className="size-5" />
                   </div>
                   <h2 className="mt-4 text-base font-semibold text-slate-900">
-                    Start with what matters
+                    {t.startTitle}
                   </h2>
                   <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                    Your mediator will clarify intent and help turn this
-                    conversation into shared understanding.
+                    {t.startDescription}
                   </p>
                 </div>
               )}
@@ -577,25 +635,25 @@ export function CharborWorkspace() {
                       sendMessage();
                     }
                   }}
-                  placeholder="Write candidly. Your mediator will help shape the message."
+                  placeholder={t.composerPlaceholder}
                   className="min-h-[92px] pb-11 pr-14 shadow-soft"
                 />
                 <div className="absolute bottom-3 left-3 flex items-center gap-1.5 text-[11px] text-slate-400">
                   <Sparkles className="size-3.5 text-blue-600" />
-                  Mediator is active
+                  {t.mediatorActive}
                 </div>
                 <Button
                   size="icon"
                   onClick={sendMessage}
                   disabled={!draft.trim()}
                   className="absolute bottom-3 right-3 size-8 rounded-lg"
-                  aria-label="Send message"
+                  aria-label={t.sendMessage}
                 >
                   <ArrowUp className="size-4" />
                 </Button>
               </div>
               <p className="mt-2 text-center text-[10px] text-slate-400">
-                Enter to send · Shift + Enter for a new line
+                {t.composerHint}
               </p>
             </div>
           </div>
@@ -610,11 +668,13 @@ export function CharborWorkspace() {
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-slate-950">Harbor Log</h2>
+                <h2 className="text-sm font-semibold text-slate-950">
+                  {t.harborLog}
+                </h2>
                 <span className="size-1.5 rounded-full bg-emerald-500" />
               </div>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                Shared understanding, updated live
+                {t.sharedUnderstanding}
               </p>
             </div>
             <Button
@@ -622,7 +682,7 @@ export function CharborWorkspace() {
               variant="ghost"
               size="icon"
               onClick={() => setMobilePanel(null)}
-              aria-label="Close Harbor Log"
+              aria-label={t.closeHarborLog}
             >
               <X className="size-4" />
             </Button>
@@ -636,6 +696,7 @@ export function CharborWorkspace() {
                     key={section}
                     section={section}
                     items={activeLog[section]}
+                    t={t}
                   />
                 ))}
               </div>
@@ -646,7 +707,7 @@ export function CharborWorkspace() {
             <div className="rounded-xl bg-slate-900 p-3.5 text-white">
               <div className="flex items-center gap-2 text-xs font-medium">
                 <Sparkles className="size-3.5 text-blue-300" />
-                Understanding health
+                {t.understandingHealth}
                 <span className="ml-auto text-blue-200">
                   {understandingHealth.label}
                 </span>
@@ -668,10 +729,108 @@ export function CharborWorkspace() {
           <button
             className="absolute inset-0 z-20 bg-slate-950/20 backdrop-blur-[1px] lg:hidden xl:hidden"
             onClick={() => setMobilePanel(null)}
-            aria-label="Close panel"
+            aria-label={t.closePanel}
           />
         )}
       </div>
+
+      {isSettingsOpen && (
+        <div
+          className="absolute inset-0 z-50 grid place-items-center bg-slate-950/35 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setIsSettingsOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="grid size-8 place-items-center rounded-lg bg-slate-100 text-slate-700">
+                    <Settings className="size-4" />
+                  </div>
+                  <h2
+                    id="settings-title"
+                    className="text-base font-semibold text-slate-950"
+                  >
+                    {t.settings}
+                  </h2>
+                </div>
+                <p className="mt-2 text-sm text-slate-500">
+                  {t.settingsDescription}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSettingsOpen(false)}
+                aria-label={t.closeSettings}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Globe2 className="size-4 text-slate-500" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {t.language}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {t.languageDescription}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {(["en", "ja"] as Locale[]).map((option) => {
+                  const selected = locale === option;
+                  const label = option === "en" ? t.english : t.japanese;
+
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => changeLocale(option)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        selected
+                          ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                      aria-pressed={selected}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {option === "en" ? "English" : "日本語"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">{label}</p>
+                        </div>
+                        <div
+                          className={cn(
+                            "grid size-5 place-items-center rounded-full border",
+                            selected
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-300 text-transparent",
+                          )}
+                        >
+                          <Check className="size-3" />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

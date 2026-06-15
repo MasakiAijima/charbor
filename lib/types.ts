@@ -3,6 +3,8 @@ export type MessageType =
   | "ai_translation"
   | "remote_ai_message";
 
+export type Locale = "en" | "ja";
+
 export interface Topic {
   id: string;
   title: string;
